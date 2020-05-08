@@ -409,6 +409,54 @@ parts:
       - libnss3
       - libnspr4
       - libxtst6
+
+  libndi:
+    plugin: nil
+    build-packages:
+      - libarchive-tools
+    stage-packages:
+      - libavahi-client3
+      - libavahi-common3
+    override-build: |
+      wget http://514f211588de67e4fdcf-437b8dd50f60b69cf0974b538e50585b.r63.cf1.rackcdn.com/Utilities/SDK/NDI_SDK_Linux_v2/InstallNDISDK_v4_Linux.tar.gz
+      mkdir NDISDK || true
+      bsdtar -x -f InstallNDISDK_v4_Linux.tar.gz -C NDISDK
+      cd NDISDK
+      TARGET="$(sed -n '/^__NDI_ARCHIVE_BEGIN__$/=' "InstallNDISDK_v4_Linux.sh")"
+      TARGET="$((TARGET + 1))"
+      tail -n +"$TARGET" "InstallNDISDK_v4_Linux.sh" | tar -zxvf -
+
+      SDK="${SNAPCRAFT_PART_BUILD}/NDISDK/NDI SDK for Linux"
+
+      # binaries
+      install -D -m755 "${SDK}/bin/${SNAPCRAFT_ARCH_TRIPLET}/"ndi* -t "${SNAPCRAFT_PART_INSTALL}/usr/bin"
+
+      # headers
+      install -D -m644 "${SDK}/include/"*.h -t "${SNAPCRAFT_PART_INSTALL}/usr/include"
+
+      # library
+      install -D -m755 "${SDK}/lib/${SNAPCRAFT_ARCH_TRIPLET}/libndi.so.4".*.* -t "${SNAPCRAFT_PART_INSTALL}/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}"
+      cd "${SNAPCRAFT_PART_INSTALL}/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}"
+      ln -s "libndi.so.4".*.* "libndi.so.4"
+      ln -s "libndi.so.4".*.*  libndi.so
+
+  obs-ndi:
+    plugin: cmake
+    after:
+      - obs
+      - libndi
+    source: https://github.com/Palakis/obs-ndi.git
+    source-tag: '4.9.0'
+    configflags: ["-DCMAKE_INSTALL_PREFIX=/usr"]
+    override-prime: |
+      if echo __SIZEOF_POINTER__ | cpp -E - - | grep '^8$' >/dev/null; then
+        cp ${SNAPCRAFT_PART_INSTALL}/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/obs-plugins/obs-ndi.so ${SNAPCRAFT_PRIME}/usr/obs-plugins/64bit/
+      else
+        cp ${SNAPCRAFT_PART_INSTALL}/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/obs-plugins/obs-ndi.so ${SNAPCRAFT_PRIME}/usr/obs-plugins/32bit/
+      fi
+      mkdir -p ${SNAPCRAFT_PRIME}/usr/data/obs-plugins/obs-ndi/locale
+      mv -v ${SNAPCRAFT_PART_INSTALL}/usr/share/obs/obs-plugins/obs-ndi/locale/*.ini ${SNAPCRAFT_PRIME}/usr/data/obs-plugins/obs-ndi/locale/
+
   obs-websocket:
     plugin: cmake
     after: [ obs ]
